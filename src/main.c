@@ -57,15 +57,19 @@ void app_main()
     /* Set the GPIO as a push/pull output */
     gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);
     UARTInit();
+    uint8_t *data = (uint8_t *) malloc(BUF_SIZE);
     while(1) {
         /* Blink off (output low) */
-	printf("Turning off the LED\n");
+	// printf("Turning off the LED\n");
+     int len = uart_read_bytes(ECHO_UART_PORT_NUM, data, (BUF_SIZE - 1), 20 / portTICK_PERIOD_MS);
         gpio_set_level(BLINK_GPIO, 0);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
         /* Blink on (output high) */
-	printf("Turning on the LED\n");
+	// printf("Turning on the LED\n");
         gpio_set_level(BLINK_GPIO, 1);
-        uart_write_bytes(ECHO_UART_PORT_NUM, "salam", 5);
+        if(len>0)
+        uart_write_bytes(ECHO_UART_PORT_NUM, data, len);
+
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }
