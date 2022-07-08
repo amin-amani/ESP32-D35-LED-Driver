@@ -19,6 +19,10 @@
 #define ECHO_TEST_TXD 1
 #define ECHO_TEST_RTS 22
 #define ECHO_TEST_CTS 19
+#define ReverseUInt(value) \
+((value >> 24) | ((value >> 16) << 8) | ((value & 0xff00) << 8) | ((value& 0xff) << 24))
+
+//====================================================================================================================
 void UARTInit()
 {
 
@@ -43,7 +47,53 @@ void UARTInit()
      ESP_ERROR_CHECK(uart_set_pin(ECHO_UART_PORT_NUM, ECHO_TEST_TXD, ECHO_TEST_RXD, ECHO_TEST_RTS, ECHO_TEST_CTS));
 
 }
+//====================================================================================================================
+void AppendToArray(uint8_t data,uint8_t *array)
+{
+*array<<=8;
+*array=data;
+  
+}
 
+uint32_t crc32(unsigned char *message, int len)
+{
+    if ((message == 0) || (len < 1)) {
+        return 0;
+    }
+    unsigned int byte, crc;
+    crc = 0xFFFFFFFF;
+    for (int i=0; i<len; i++) {
+        byte = message[i];
+        byte = ReverseUInt(byte);
+        for (int j=0; j<8; j++) {
+            if (((int)(crc ^ byte)) < 0) {
+                crc = (crc << 1) ^ 0x04C11DB7;
+            } else {
+                crc = crc << 1;
+            }
+            byte = byte << 1;
+        }
+    }
+    return ReverseUInt(~crc);
+}
+//====================================================================================================================
+void SendTemp(uint32_t temp)
+{uint8_t packet[50]={0x0a,0x0d,0x10,0x05,0x00,0x28,
+                    0x00,0x0a,0x00,0x01,0x00,0x01,0x00,0x1e,0x00,0x00,
+                    0x00,0x0a,0x00,0x02,0x00,0x01,0x00,0x00,0x00,0x00,
+                    0x00,0x0a,0x00,0x03,0x00,0x01,0x00,0x28,0x00,0x00,
+                    0x00,0x0a,0x00,0x05,0x00,0x01,0x00,0x3c,0x00,0x00,
+                    0xb6,0xd6,0x9a,0x42};
+    uint32_t crc=0;
+    packet[22]=(temp>>8)&0xff;
+    packet[23]=(temp>>0)&0xff;
+    crc= crc32(packet,46);
+    packet[46]=(crc>>24)&0xff;
+    packet[47]=(crc>>16)&0xff;
+    packet[48]=(crc>>8)&0xff;
+    packet[49]=(crc>>0)&0xff;
+      uart_write_bytes(ECHO_UART_PORT_NUM, packet, sizeof(packet));
+}
 
 void app_main()
 {
@@ -57,18 +107,17 @@ void app_main()
     /* Set the GPIO as a push/pull output */
     gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);
     UARTInit();
-    uint8_t *data = (uint8_t *) malloc(BUF_SIZE);
     while(1) {
         /* Blink off (output low) */
 	// printf("Turning off the LED\n");
-     int len = uart_read_bytes(ECHO_UART_PORT_NUM, data, (BUF_SIZE - 1), 20 / portTICK_PERIOD_MS);
-        gpio_set_level(BLINK_GPIO, 0);
+         gpio_set_level(BLINK_GPIO, 0);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
         /* Blink on (output high) */
+        SendTemp(22);
 	// printf("Turning on the LED\n");
         gpio_set_level(BLINK_GPIO, 1);
-        if(len>0)
-        uart_write_bytes(ECHO_UART_PORT_NUM, data, len);
+     
+      
 
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }

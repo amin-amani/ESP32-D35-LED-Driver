@@ -1,10 +1,12 @@
 {
-    "files.associations": {
-        "stddef.h": "c",
-        "string.h": "c",
-        "freertos.h": "c",
-        "task.h": "c",
-        "gpio.h": "c",
-        "sdkconfig.h": "c"
-    }
+  "files.associations": {
+    "stddef.h": "c",
+    "string.h": "c",
+    "freertos.h": "c",
+    "task.h": "c",
+    "gpio.h": "c",
+    "sdkconfig.h": "c",
+    "*.tcc": "c",
+    "string": "c"
+  }
 }
