@@ -7,6 +7,7 @@
     "gpio.h": "c",
     "sdkconfig.h": "c",
     "*.tcc": "c",
-    "string": "c"
+    "string": "c",
+    "esp_adc_cal.h": "c"
   }
 }
