@@ -17,14 +17,18 @@
 #define ECHO_TEST_TXD 1
 #define ECHO_TEST_RTS 22
 #define ECHO_TEST_CTS 19
-#define ReverseUInt(value) \
-((value >> 24) | ((value >> 16) << 8) | ((value & 0xff00) << 8) | ((value& 0xff) << 24))
-
-#define ADC1_EXAMPLE_CHAN0          ADC1_CHANNEL_6
+#define ADC1_EXAMPLE_CHAN0          ADC1_CHANNEL_6 
 #define ADC_EXAMPLE_CALI_SCHEME     ESP_ADC_CAL_VAL_EFUSE_VREF
 #define ADC_EXAMPLE_ATTEN           ADC_ATTEN_DB_11
+
+#define ReverseUInt(value) \
+((value >> 24) | ((value >> 16) << 8) | ((value & 0xff00) << 8) | ((value& 0xff) << 24))
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 static esp_adc_cal_characteristics_t adc1_chars;
 uint32_t  voltage=0;
+//====================================================================================================================
+
 static bool adc_calibration_init(void)
 {
     esp_err_t ret;
@@ -111,6 +115,7 @@ void SendTemp(uint32_t temp)
     packet[49]=(crc>>0)&0xff;
       uart_write_bytes(ECHO_UART_PORT_NUM, packet, sizeof(packet));
 }
+//====================================================================================================================
 
 void app_main()
 {
@@ -132,7 +137,7 @@ void app_main()
 	// printf("Turning off the LED\n");
     voltage = esp_adc_cal_raw_to_voltage(adc1_get_raw(ADC1_EXAMPLE_CHAN0), &adc1_chars);
     printf("v= %d mv\n",voltage);
-
+    SendTemp(voltage/10);
 
          gpio_set_level(BLINK_GPIO, 0);
         vTaskDelay(100 / portTICK_PERIOD_MS);
