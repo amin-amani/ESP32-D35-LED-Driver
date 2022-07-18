@@ -10,6 +10,8 @@
 #include "driver/adc.h"
 #include "esp_log.h"
 #include "esp_adc_cal.h"
+#include "nvs_flash.h"
+#include "nvs.h"
 #define BLINK_GPIO 2
 #define BUF_SIZE (1024)
 #define ECHO_UART_PORT_NUM 0
@@ -27,6 +29,9 @@
 
 static esp_adc_cal_characteristics_t adc1_chars;
 uint32_t  voltage=0;
+
+double temp=0,AvrageVoltage=0;
+uint16_t alfa=100;
 //====================================================================================================================
 
 static bool adc_calibration_init(void)
@@ -97,6 +102,20 @@ uint32_t crc32(unsigned char *message, int len)
     }
     return ReverseUInt(~crc);
 }
+
+void NVSInit()
+{
+  esp_err_t err = nvs_flash_init();
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        // NVS partition was truncated and needs to be erased
+        // Retry nvs_flash_init
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        err = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK( err );
+    
+
+}
 //====================================================================================================================
 void SendTemp(uint32_t temp)
 {uint8_t packet[50]={0x0a,0x0d,0x10,0x05,0x00,0x28,
@@ -129,6 +148,51 @@ void app_main()
     /* Set the GPIO as a push/pull output */
     gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);
     UARTInit();
+    
+//==================nvs
+NVSInit();
+     nvs_handle_t my_handle;
+   esp_err_t  err = nvs_open("storage", NVS_READWRITE, &my_handle);
+
+    if (err != ESP_OK) {
+        printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
+    }
+     else {
+        printf("Done\n");
+
+        // Read
+        printf("Reading restart counter from NVS ... ");
+        int32_t restart_counter = 0; // value will default to 0, if not set yet in NVS
+        err = nvs_get_i32(my_handle, "restart_counter", &restart_counter);
+        switch (err) {
+            case ESP_OK:
+                printf("Done\n");
+                printf("Restart counter = %d\n", restart_counter);
+                break;
+            case ESP_ERR_NVS_NOT_FOUND:
+                printf("The value is not initialized yet!\n");
+                break;
+            default :
+                printf("Error (%s) reading!\n", esp_err_to_name(err));
+        }
+
+        // Write
+        printf("Updating restart counter in NVS ... ");
+        restart_counter++;
+        err = nvs_set_i32(my_handle, "restart_counter", restart_counter);
+        printf((err != ESP_OK) ? "Failed!\n" : "Done\n");
+     }
+     //4m 0 //600mv
+     //20m 350 // 3000mv
+///ax+b
+//a*(X-600)=y
+//a*(3000-600)=350
+//2400*a=350 =0.145
+//0.145*(adc-600)
+
+
+     //150 ohm
+//==================nvs
     adc_calibration_init();
     // ESP_ERROR_CHECK(adc1_config_width(ADC_WIDTH_BIT_DEFAULT));
     ESP_ERROR_CHECK(adc2_config_channel_atten(ADC1_EXAMPLE_CHAN0, ADC_EXAMPLE_ATTEN));
@@ -139,7 +203,12 @@ void app_main()
     adc2_get_raw(ADC1_EXAMPLE_CHAN0,ADC_WIDTH_12Bit,&v1);
     voltage = esp_adc_cal_raw_to_voltage(v1, &adc1_chars);
     printf("v= %d mv\n",voltage);
-    SendTemp(voltage/10);
+ 
+    AvrageVoltage=(AvrageVoltage*9 +voltage)/10;
+    temp=AvrageVoltage;
+    temp=(145*temp*alfa)/100000; //60 to 140
+    temp-=87;
+    SendTemp(temp);
 
          gpio_set_level(BLINK_GPIO, 0);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
