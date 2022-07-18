@@ -12,7 +12,13 @@
 #include "esp_adc_cal.h"
 #include "nvs_flash.h"
 #include "nvs.h"
+#include "Buttons.h"
 #define BLINK_GPIO 2
+#define GPIO_INPUT_IO_0     12
+#define GPIO_INPUT_IO_1     14
+#define GPIO_INPUT_PIN_SEL  ((1ULL<<GPIO_INPUT_IO_0) | (1ULL<<GPIO_INPUT_IO_1))
+
+
 #define BUF_SIZE (1024)
 #define ECHO_UART_PORT_NUM 0
 #define ECHO_TEST_RXD 3
@@ -29,7 +35,7 @@
 
 static esp_adc_cal_characteristics_t adc1_chars;
 uint32_t  voltage=0;
-
+  int v1;
 double temp=0,AvrageVoltage=0;
 uint16_t alfa=100;
 //====================================================================================================================
@@ -102,6 +108,7 @@ uint32_t crc32(unsigned char *message, int len)
     }
     return ReverseUInt(~crc);
 }
+//====================================================================================================================
 
 void NVSInit()
 {
@@ -135,7 +142,48 @@ void SendTemp(uint32_t temp)
       uart_write_bytes(ECHO_UART_PORT_NUM, packet, sizeof(packet));
 }
 //====================================================================================================================
-  int v1;
+ bool Key1()
+{
+    return gpio_get_level(GPIO_INPUT_IO_0);
+    
+}
+//====================================================================================================================
+ bool Key2()
+{
+return gpio_get_level(GPIO_INPUT_IO_1);
+//	return ((GPIOB->IDR&(1<<4))>>4);
+}
+//====================================================================================================================
+void OnUpKeyPressed()
+{
+printf("Up\n");
+}
+//====================================================================================================================
+
+void OnDownKeyPressed()
+{
+printf("down\n");
+}
+
+//====================================================================================================================
+void GPIOInit()
+{
+        gpio_config_t io_conf = {};
+   //interrupt of rising edge
+    io_conf.intr_type = GPIO_INTR_DISABLE;
+    //bit mask of the pins, use GPIO4/5 here
+    io_conf.pin_bit_mask = GPIO_INPUT_PIN_SEL;
+    //set as input mode
+    io_conf.mode = GPIO_MODE_INPUT;
+    //enable pull-up mode
+    io_conf.pull_up_en = 1;
+    gpio_config(&io_conf);
+      
+    gpio_pad_select_gpio(BLINK_GPIO);
+    /* Set the GPIO as a push/pull output */
+    gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);
+
+}
 void app_main()
 {
     /* Configure the IOMUX register for pad BLINK_GPIO (some pads are
@@ -143,59 +191,57 @@ void app_main()
        functions and need to be switched to GPIO. Consult the
        Technical Reference for a list of pads and their default
        functions.)
-    */
-    gpio_pad_select_gpio(BLINK_GPIO);
-    /* Set the GPIO as a push/pull output */
-    gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);
+  */
+
+     GPIOInit();
     UARTInit();
     
 //==================nvs
-NVSInit();
-     nvs_handle_t my_handle;
-   esp_err_t  err = nvs_open("storage", NVS_READWRITE, &my_handle);
+// NVSInit();
+//      nvs_handle_t my_handle;
+//    esp_err_t  err = nvs_open("storage", NVS_READWRITE, &my_handle);
 
-    if (err != ESP_OK) {
-        printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
-    }
-     else {
-        printf("Done\n");
+//     if (err != ESP_OK) {
+//         printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
+//     }
+//      else {
+//         printf("Done\n");
 
-        // Read
-        printf("Reading restart counter from NVS ... ");
-        int32_t restart_counter = 0; // value will default to 0, if not set yet in NVS
-        err = nvs_get_i32(my_handle, "restart_counter", &restart_counter);
-        switch (err) {
-            case ESP_OK:
-                printf("Done\n");
-                printf("Restart counter = %d\n", restart_counter);
-                break;
-            case ESP_ERR_NVS_NOT_FOUND:
-                printf("The value is not initialized yet!\n");
-                break;
-            default :
-                printf("Error (%s) reading!\n", esp_err_to_name(err));
-        }
+//         // Read
+//         printf("Reading restart counter from NVS ... ");
+//         int32_t restart_counter = 0; // value will default to 0, if not set yet in NVS
+//         err = nvs_get_i32(my_handle, "restart_counter", &restart_counter);
+//         switch (err) {
+//             case ESP_OK:
+//                 printf("Done\n");
+//                 printf("Restart counter = %d\n", restart_counter);
+//                 break;
+//             case ESP_ERR_NVS_NOT_FOUND:
+//                 printf("The value is not initialized yet!\n");
+//                 break;
+//             default :
+//                 printf("Error (%s) reading!\n", esp_err_to_name(err));
+//         }
 
-        // Write
-        printf("Updating restart counter in NVS ... ");
-        restart_counter++;
-        err = nvs_set_i32(my_handle, "restart_counter", restart_counter);
-        printf((err != ESP_OK) ? "Failed!\n" : "Done\n");
-     }
-     //4m 0 //600mv
-     //20m 350 // 3000mv
-///ax+b
-//a*(X-600)=y
-//a*(3000-600)=350
-//2400*a=350 =0.145
-//0.145*(adc-600)
+//         // Write
+//         printf("Updating restart counter in NVS ... ");
+//         restart_counter++;
+//         err = nvs_set_i32(my_handle, "restart_counter", restart_counter);
+//         printf((err != ESP_OK) ? "Failed!\n" : "Done\n");
+//      }
 
+// //==================nvs
+//     adc_calibration_init();
+//     ESP_ERROR_CHECK(adc2_config_channel_atten(ADC1_EXAMPLE_CHAN0, ADC_EXAMPLE_ATTEN));
 
-     //150 ohm
-//==================nvs
-    adc_calibration_init();
-    // ESP_ERROR_CHECK(adc1_config_width(ADC_WIDTH_BIT_DEFAULT));
-    ESP_ERROR_CHECK(adc2_config_channel_atten(ADC1_EXAMPLE_CHAN0, ADC_EXAMPLE_ATTEN));
+    RegisterButton(Key1,OnUpKeyPressed,2);
+    RegisterButton(Key2,OnDownKeyPressed,2);
+
+      while(1) {
+CheckButtons();
+vTaskDelay(50 / portTICK_PERIOD_MS);
+      }
+    
     while(1) {
         /* Blink off (output low) */
 	// printf("Turning off the LED\n");
