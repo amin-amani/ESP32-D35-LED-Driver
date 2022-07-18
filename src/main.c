@@ -17,7 +17,7 @@
 #define ECHO_TEST_TXD 1
 #define ECHO_TEST_RTS 22
 #define ECHO_TEST_CTS 19
-#define ADC1_EXAMPLE_CHAN0          ADC1_CHANNEL_6 
+#define ADC1_EXAMPLE_CHAN0          ADC2_CHANNEL_3 
 #define ADC_EXAMPLE_CALI_SCHEME     ESP_ADC_CAL_VAL_EFUSE_VREF
 #define ADC_EXAMPLE_ATTEN           ADC_ATTEN_DB_11
 
@@ -41,7 +41,7 @@ static bool adc_calibration_init(void)
         printf("eFuse not burnt, skip software calibration\n");
     } else if (ret == ESP_OK) {
         cali_enable = true;
-        esp_adc_cal_characterize(ADC_UNIT_1, ADC_EXAMPLE_ATTEN, ADC_WIDTH_BIT_DEFAULT, 0, &adc1_chars);
+        esp_adc_cal_characterize(ADC_UNIT_2, ADC_EXAMPLE_ATTEN, ADC_WIDTH_BIT_DEFAULT, 0, &adc1_chars);
  printf("adc Init ok\n");
     } else {
         printf("Invalid arg\n");
@@ -116,7 +116,7 @@ void SendTemp(uint32_t temp)
       uart_write_bytes(ECHO_UART_PORT_NUM, packet, sizeof(packet));
 }
 //====================================================================================================================
-
+  int v1;
 void app_main()
 {
     /* Configure the IOMUX register for pad BLINK_GPIO (some pads are
@@ -130,12 +130,14 @@ void app_main()
     gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);
     UARTInit();
     adc_calibration_init();
-    ESP_ERROR_CHECK(adc1_config_width(ADC_WIDTH_BIT_DEFAULT));
-    ESP_ERROR_CHECK(adc1_config_channel_atten(ADC1_EXAMPLE_CHAN0, ADC_EXAMPLE_ATTEN));
+    // ESP_ERROR_CHECK(adc1_config_width(ADC_WIDTH_BIT_DEFAULT));
+    ESP_ERROR_CHECK(adc2_config_channel_atten(ADC1_EXAMPLE_CHAN0, ADC_EXAMPLE_ATTEN));
     while(1) {
         /* Blink off (output low) */
 	// printf("Turning off the LED\n");
-    voltage = esp_adc_cal_raw_to_voltage(adc1_get_raw(ADC1_EXAMPLE_CHAN0), &adc1_chars);
+  
+    adc2_get_raw(ADC1_EXAMPLE_CHAN0,ADC_WIDTH_12Bit,&v1);
+    voltage = esp_adc_cal_raw_to_voltage(v1, &adc1_chars);
     printf("v= %d mv\n",voltage);
     SendTemp(voltage/10);
 
