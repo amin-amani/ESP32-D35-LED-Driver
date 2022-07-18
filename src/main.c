@@ -35,9 +35,9 @@
 
 static esp_adc_cal_characteristics_t adc1_chars;
 uint32_t  voltage=0;
-  int v1;
+int v1;
 double temp=0,AvrageVoltage=0;
-uint16_t alfa=100;
+int32_t ramp=100;
 //====================================================================================================================
 
 static bool adc_calibration_init(void)
@@ -86,6 +86,7 @@ void UARTInit()
      ESP_ERROR_CHECK(uart_set_pin(ECHO_UART_PORT_NUM, ECHO_TEST_TXD, ECHO_TEST_RXD, ECHO_TEST_RTS, ECHO_TEST_CTS));
 
 }
+//====================================================================================================================
 
 uint32_t crc32(unsigned char *message, int len)
 {
@@ -124,6 +125,56 @@ void NVSInit()
 
 }
 //====================================================================================================================
+
+void SetRampParameter(int32_t value)
+{
+         nvs_handle_t my_handle;
+
+   esp_err_t  err = nvs_open("storage", NVS_READWRITE, &my_handle);
+       if (err != ESP_OK) {
+        printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
+        return ;
+    }
+            err = nvs_set_i32(my_handle, "ramp", value);
+        if(err != ESP_OK)
+        {
+            printf("save param Failed!\n");
+           
+           
+        }  
+            nvs_close(my_handle);
+}
+//====================================================================================================================
+
+uint32_t GetRampParameter()
+{
+  int32_t result = 100; 
+     nvs_handle_t my_handle;
+   esp_err_t  err = nvs_open("storage", NVS_READWRITE, &my_handle);
+
+    if (err != ESP_OK) {
+        printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
+        return result;
+    }
+     
+
+      // value will default to 0, if not set yet in NVS
+        err = nvs_get_i32(my_handle, "ramp", &result);
+        switch (err) {
+            case ESP_OK:
+
+                printf("Restart ramp = %d\n", result);
+                break;
+            case ESP_ERR_NVS_NOT_FOUND:
+                printf("The value is not initialized yet!\n");
+                break;
+            default :
+                printf("Error (%s) reading!\n", esp_err_to_name(err));
+        }
+        nvs_close(my_handle);
+        return result;
+}
+//====================================================================================================================
 void SendTemp(uint32_t temp)
 {uint8_t packet[50]={0x0a,0x0d,0x10,0x05,0x00,0x28,
                     0x00,0x0a,0x00,0x01,0x00,0x01,0x00,0x1e,0x00,0x00,
@@ -157,12 +208,20 @@ return gpio_get_level(GPIO_INPUT_IO_1);
 void OnUpKeyPressed()
 {
 printf("Up\n");
+if(ramp<120)
+ramp++;
+SetRampParameter(ramp);
+
 }
 //====================================================================================================================
 
 void OnDownKeyPressed()
 {
 printf("down\n");
+
+if(ramp>80)
+ramp--;
+SetRampParameter(ramp);
 }
 
 //====================================================================================================================
@@ -186,85 +245,30 @@ void GPIOInit()
 }
 void app_main()
 {
-    /* Configure the IOMUX register for pad BLINK_GPIO (some pads are
-       muxed to GPIO on reset already, but some default to other
-       functions and need to be switched to GPIO. Consult the
-       Technical Reference for a list of pads and their default
-       functions.)
-  */
-
-     GPIOInit();
+    GPIOInit();
     UARTInit();
-    
-//==================nvs
-// NVSInit();
-//      nvs_handle_t my_handle;
-//    esp_err_t  err = nvs_open("storage", NVS_READWRITE, &my_handle);
-
-//     if (err != ESP_OK) {
-//         printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
-//     }
-//      else {
-//         printf("Done\n");
-
-//         // Read
-//         printf("Reading restart counter from NVS ... ");
-//         int32_t restart_counter = 0; // value will default to 0, if not set yet in NVS
-//         err = nvs_get_i32(my_handle, "restart_counter", &restart_counter);
-//         switch (err) {
-//             case ESP_OK:
-//                 printf("Done\n");
-//                 printf("Restart counter = %d\n", restart_counter);
-//                 break;
-//             case ESP_ERR_NVS_NOT_FOUND:
-//                 printf("The value is not initialized yet!\n");
-//                 break;
-//             default :
-//                 printf("Error (%s) reading!\n", esp_err_to_name(err));
-//         }
-
-//         // Write
-//         printf("Updating restart counter in NVS ... ");
-//         restart_counter++;
-//         err = nvs_set_i32(my_handle, "restart_counter", restart_counter);
-//         printf((err != ESP_OK) ? "Failed!\n" : "Done\n");
-//      }
-
-// //==================nvs
-//     adc_calibration_init();
-//     ESP_ERROR_CHECK(adc2_config_channel_atten(ADC1_EXAMPLE_CHAN0, ADC_EXAMPLE_ATTEN));
+    NVSInit();
+    ramp=GetRampParameter();
+    adc_calibration_init();
+    ESP_ERROR_CHECK(adc2_config_channel_atten(ADC1_EXAMPLE_CHAN0, ADC_EXAMPLE_ATTEN));
 
     RegisterButton(Key1,OnUpKeyPressed,2);
     RegisterButton(Key2,OnDownKeyPressed,2);
-
-      while(1) {
-CheckButtons();
-vTaskDelay(50 / portTICK_PERIOD_MS);
-      }
-    
-    while(1) {
-        /* Blink off (output low) */
-	// printf("Turning off the LED\n");
+    while(1) 
+    {
   
     adc2_get_raw(ADC1_EXAMPLE_CHAN0,ADC_WIDTH_12Bit,&v1);
     voltage = esp_adc_cal_raw_to_voltage(v1, &adc1_chars);
-    printf("v= %d mv\n",voltage);
- 
+
     AvrageVoltage=(AvrageVoltage*9 +voltage)/10;
     temp=AvrageVoltage;
-    temp=(145*temp*alfa)/100000; //60 to 140
+    temp=(145*temp*ramp)/100000; //60 to 140
     temp-=87;
     SendTemp(temp);
-
-         gpio_set_level(BLINK_GPIO, 0);
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-        /* Blink on (output high) */
-        // SendTemp(22);
-	// printf("Turning on the LED\n");
-        gpio_set_level(BLINK_GPIO, 1);
-     
-      
-
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+    gpio_set_level(BLINK_GPIO, 0);
+    vTaskDelay(50 / portTICK_PERIOD_MS);
+    CheckButtons();
+    gpio_set_level(BLINK_GPIO, 1);
+    vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
