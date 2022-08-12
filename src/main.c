@@ -175,7 +175,7 @@ uint32_t GetRampParameter()
         return result;
 }
 //====================================================================================================================
-void SendTemp(uint32_t temp)
+void SensSensorValues(float humidity,float luminance,float temp ,float temp2)
 {uint8_t packet[50]={0x0a,0x0d,0x10,0x05,0x00,0x28,
                     0x00,0x0a,0x00,0x01,0x00,0x01,0x00,0x1e,0x00,0x00,
                     0x00,0x0a,0x00,0x02,0x00,0x01,0x00,0x00,0x00,0x00,
@@ -183,8 +183,37 @@ void SendTemp(uint32_t temp)
                     0x00,0x0a,0x00,0x05,0x00,0x01,0x00,0x3c,0x00,0x00,
                     0xb6,0xd6,0x9a,0x42};
     uint32_t crc=0;
-    packet[22]=(temp>>8)&0xff;
-    packet[23]=(temp>>0)&0xff;
+    int16_t num=0,mantis=0;
+    
+    num=luminance;
+    mantis=(luminance*10)-(num*10);
+    packet[12]=(num>>8)&0xff;
+    packet[13]=(num>>0)&0xff;
+    packet[14]=(mantis>>8)&0xff;
+    packet[15]=(mantis>>0)&0xff;
+   
+    num=temp;
+    mantis=(temp*10)-(num*10);
+    packet[22]=(num>>8)&0xff;
+    packet[23]=(num>>0)&0xff;
+    packet[24]=(mantis>>8)&0xff;
+    packet[25]=(mantis>>0)&0xff;
+
+    num=humidity;
+    mantis=(humidity*10)-(num*10);
+    packet[32]=(num>>8)&0xff;
+    packet[33]=(num>>0)&0xff;
+    packet[34]=(mantis>>8)&0xff;
+    packet[35]=(mantis>>0)&0xff;
+
+
+    num=temp2;
+    mantis=(temp2*10)-(num*10);
+    packet[42]=(num>>8)&0xff;
+    packet[43]=(num>>0)&0xff;
+    packet[44]=(mantis>>8)&0xff;
+    packet[45]=(mantis>>0)&0xff;
+
     crc= crc32(packet,46);
     packet[46]=(crc>>24)&0xff;
     packet[47]=(crc>>16)&0xff;
@@ -264,7 +293,7 @@ void app_main()
     temp=AvrageVoltage;
     temp=(145*temp*ramp)/100000; //60 to 140
     temp-=87;
-    SendTemp(temp);
+    SensSensorValues(temp,0,0,0);
     gpio_set_level(BLINK_GPIO, 0);
     vTaskDelay(50 / portTICK_PERIOD_MS);
     CheckButtons();
